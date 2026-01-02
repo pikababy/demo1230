@@ -11,36 +11,45 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
+    # ========== 矩阵测试配置 ==========
+    strategy:
+      fail-fast: false  # 一个失败不中断其他测试
+      matrix:
+        # Node.js 版本（可按需增减）
+        node-version: [20, 22]
+        # 浏览器（Playwright 支持的三大浏览器）
+        browser: [chromium, firefox, webkit]
+
     steps:
       # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 设置 Node.js
-      - name: Setup Node.js
+      # 2. 设置 Node.js（使用矩阵变量）
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       # 3. 安装依赖
       - name: Install dependencies
         run: npm ci
 
-      # 4. 安装 Playwright 浏览器
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
+      # 4. 安装 Playwright 浏览器（只安装当前矩阵需要的浏览器）
+      - name: Install Playwright Browser (${{ matrix.browser }})
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
-      # 5. 运行 Playwright 测试
-      - name: Run Playwright tests
-        run: npx playwright test
+      # 5. 运行 Playwright 测试（指定浏览器项目）
+      - name: Run tests on ${{ matrix.browser }}
+        run: npx playwright test --project=${{ matrix.browser }}
 
-      # 6. 上传测试报告
+      # 6. 上传测试报告（带环境标识）
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-node${{ matrix.node-version }}-${{ matrix.browser }}
           path: playwright-report/
           retention-days: 30
 
@@ -49,6 +58,6 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-results
+          name: test-results-node${{ matrix.node-version }}-${{ matrix.browser }}
           path: test-results/
           retention-days: 30
