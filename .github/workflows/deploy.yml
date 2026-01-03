@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+
+on:
+  # 测试通过后自动部署（当 Playwright Tests 工作流成功完成时触发）
+  workflow_run:
+    workflows: ["Playwright Tests"]
+    branches: [main]
+    types:
+      - completed
+
+  # 也可以手动触发部署
+  workflow_dispatch:
+
+# 设置 GITHUB_TOKEN 权限以允许部署到 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 只允许一个并发部署
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  # 构建作业
+  build:
+    runs-on: ubuntu-latest
+    # 只有当测试工作流成功时才运行（或手动触发时）
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # 设置 base URL 为你的仓库名
+          VITE_BASE_URL: /demo1230/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  # 部署作业
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
